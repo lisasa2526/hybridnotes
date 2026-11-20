@@ -70,6 +70,24 @@ Check*, not by the AI Logic path itself.
 3. (Not recommended beyond demo day: turning enforcement back off also
    unblocks, at the cost of an unprotected endpoint.)
 
+**Status update (2026-11-20, later session):** steps 1–2 are DONE.
+The site key is in `.env`, the bundle was rebuilt (`index-BSNZ6M7b.js`)
+and redeployed to GitHub Pages (served JS is byte-identical to the
+local build, site key present, debug token absent from the bundle).
+`scripts/verify-cloud.mjs` now supports the debug token via the
+`FIREBASE_APPCHECK_DEBUG_TOKEN` env var (never committed): with it,
+cloud and hybrid calls both PASS with `inferenceSource: "in_cloud"` —
+the Node 401 is gone; without it, the 401 baseline still reproduces.
+**One new blocker found on the live Pages origin:** reCAPTCHA will
+not mint a token for `lisasa2526.github.io` because that domain is
+not registered on the key (only `hybridnotes-33869.web.app` /
+`.firebaseapp.com` are) — browser console: `AppCheck: ReCAPTCHA
+error. (appCheck/recaptcha-error)`, generateContent → 401
+`UNAUTHENTICATED`. Remaining fix (console, parent/user): add
+`lisasa2526.github.io` to the reCAPTCHA key's domains in Google
+Cloud Console, or serve from Firebase Hosting (domains already
+registered). Full evidence: `VERIFICATION.md` §5.
+
 ## 3. On-device path (ONLY_ON_DEVICE / Gemini Nano) — ⚠️ NOT testable here
 
 This environment has no Chrome and no Gemini Nano (Node has no
@@ -94,8 +112,9 @@ browser do need the site key from §2c.)
 | Item | Status | Owner |
 | --- | --- | --- |
 | Firebase project + AI Logic + web config in `.env` | ✅ done (hybridnotes-33869, Spark) | — |
-| Cloud path verified live | ✅ PASS (evidence §2b); re-verify after App Check fix | agent, after user console step |
-| App Check site key / debug token (§2c) | ⏳ pending | **user** (Firebase console) |
+| Cloud path verified live | ✅ PASS (evidence §2b); re-verified after App Check fix — Node + debug token PASS, 401 gone (see §2c status update) | agent |
+| App Check site key / debug token (§2c) | ✅ done 2026-11-20 (console by user/parent; wiring + re-verification by agent) | — |
+| reCAPTCHA key domain for Pages origin | ⏳ pending — add `lisasa2526.github.io` to the key's domains in Google Cloud Console (or serve from Firebase Hosting); until then Pages cloud legs fall back to local | **user/parent** (console) |
 | Public GitHub repo under lisasa2526 | ✅ done — https://github.com/lisasa2526/hybridnotes | agent (gh was authenticated) |
 | Open-source license in repo | ✅ MIT `LICENSE` | — |
 | Hosting / testing link (deploy `dist/`) | ✅ done — **https://lisasa2526.github.io/hybridnotes/** (GitHub Pages, `gh-pages` branch, 2026-11-20; Firebase Hosting remains an alternative, not required) | agent |
@@ -117,12 +136,14 @@ browser do need the site key from §2c.)
 - Verified live: page HTTP 200 (title "HybridNotes — Private notes,
   summarized on your device"), referenced JS and CSS both HTTP 200.
 - **What this does NOT prove** (unchanged from §2c/§3): Pages only
-  provides the public testing link the submission needs. In-browser
-  *cloud* legs from this page still need the App Check site key
-  (`VITE_FIREBASE_APPCHECK_SITE_KEY`), and the on-device Gemini Nano leg
-  still needs the user's own Chrome. With zero setup the page answers
-  via the local fallback engine, honestly badged — the judge path works
-  today.
+  provides the public testing link the submission needs. The
+  on-device Gemini Nano leg still needs the user's own Chrome. With
+  zero setup the page answers via the local fallback engine, honestly
+  badged — the judge path works today. (Update 2026-11-20, later: the
+  App Check site key is now in the deployed build, but reCAPTCHA
+  refuses tokens for the unregistered `lisasa2526.github.io` domain,
+  so Pages cloud legs still land on the local fallback until the
+  domain is registered on the key — §2c status update.)
 - Firebase Hosting under the user's project remains an alternative host;
   it is **not required** now that the Pages link is live.
 
@@ -130,7 +151,9 @@ browser do need the site key from §2c.)
 
 **Cloud leg: PASS** (real Gemini response, `inferenceSource: "in_cloud"`,
 before App Check enforcement flipped on). **On-device leg: UNVERIFIED**
-(needs the user's Chrome). **Overall: conditionally passed** — the one
-outstanding technical fix is App Check configuration in the console
-(§2c), after which `node scripts/verify-cloud.mjs` (with a debug token)
-or a browser run re-confirms in minutes.
+(needs the user's Chrome). **Overall: conditionally passed** — App
+Check is now configured and the Node path re-verifies clean with a
+debug token; the one outstanding item is registering the GitHub
+Pages domain on the reCAPTCHA key (or moving hosting to Firebase
+Hosting) so the public Pages link can mint App Check tokens
+(§2c status update, `VERIFICATION.md` §5).

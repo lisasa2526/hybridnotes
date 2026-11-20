@@ -1,6 +1,9 @@
 // Confidence-gate verification: REAL Firebase AI Logic cloud call.
 //
 // Run from the project root:  node scripts/verify-cloud.mjs
+// If the project enforces App Check (401s), register a debug token in the
+// Firebase console and run with it in the environment (never commit it):
+//   FIREBASE_APPCHECK_DEBUG_TOKEN=<uuid> node scripts/verify-cloud.mjs
 //
 // Reads the same .env values the Vite app uses (VITE_FIREBASE_*), initializes
 // the Firebase AI Logic web SDK exactly like src/firebase-ai.js does
@@ -14,6 +17,7 @@
 
 import { readFileSync } from "node:fs";
 import { initializeApp } from "firebase/app";
+import { initializeAppCheck, CustomProvider } from "firebase/app-check";
 import { getAI, getGenerativeModel, GoogleAIBackend, InferenceMode } from "firebase/ai";
 import { buildPrompt } from "../src/prompts.js";
 
@@ -51,6 +55,32 @@ const CLOUD_MODEL = process.argv[2] || appModel || "gemini-3.8-flash";
 console.log(`Model under test: ${CLOUD_MODEL}`);
 
 const app = initializeApp(firebaseConfig);
+
+// Optional App Check debug token (added 2026-11-20): when the project
+// enforces App Check, token-less Node calls get 401 "Firebase App Check
+// token is invalid". Register a debug token in the Firebase console
+// (App Check → Apps → Manage debug tokens) and pass it ONLY via the
+// FIREBASE_APPCHECK_DEBUG_TOKEN environment variable — never commit it.
+// The SDK exchanges the debug token for a real App Check token; the
+// reCAPTCHA provider below is never actually exercised in Node.
+const debugToken = process.env.FIREBASE_APPCHECK_DEBUG_TOKEN || "";
+if (debugToken) {
+  globalThis.FIREBASE_APPCHECK_DEBUG_TOKEN = debugToken;
+  // CustomProvider, not ReCaptchaEnterpriseProvider: the reCAPTCHA
+  // provider's initialize() touches the DOM and crashes in Node. In
+  // debug mode the SDK exchanges the debug token before ever calling
+  // the provider, so this getToken is never exercised.
+  initializeAppCheck(app, {
+    provider: new CustomProvider(() =>
+      Promise.reject(new Error("debug token should have been used instead"))
+    ),
+    isTokenAutoRefreshEnabled: true,
+  });
+  console.log("App Check: debug token provided via env — App Check initialized.");
+} else {
+  console.log("App Check: no debug token env var — calling without App Check.");
+}
+
 const ai = getAI(app, { backend: new GoogleAIBackend() });
 
 const prompt = buildPrompt({
