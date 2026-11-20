@@ -16,12 +16,12 @@ the user's behalf)
 | # | Devpost requirement | Status | Notes |
 | --- | --- | --- | --- |
 | 1 | GenAI web app built with Firebase AI Logic | ✅ | `src/firebase-ai.js` imports `firebase/ai`, creates `ONLY_ON_DEVICE`, `PREFER_ON_DEVICE` hybrid and cloud models; `src/hybrid-service.js` calls them at runtime on every Run click when configured. |
-| 2 | Hybrid inference actually used (on-device + cloud fallback) | ✅ cloud verified live / ⚠️ on-device unverified | Cloud leg proven 2026-11-20 against the real project (see `GATE.md`): real Gemini response with `inferenceSource: "in_cloud"`. Model had to move `gemini-2.5-flash` → `gemini-3.8-flash` (API retired the old one for new users). Since ≈12:47 CST the project enforces App Check, so browser/cloud use needs the App Check site key in `.env` (code already supports it). On-device leg still needs the user's Chrome with Gemini Nano. |
+| 2 | Hybrid inference actually used (on-device + cloud fallback) | ✅ cloud verified live / ⚠️ on-device unverified | Cloud leg proven 2026-11-20 against the real project (see `GATE.md`): real Gemini response with `inferenceSource: "in_cloud"`. Model had to move `gemini-2.5-flash` → `gemini-3.8-flash` (API retired the old one for new users). Since ≈12:47 CST the project enforces App Check for token-less Node calls (401s in `GATE.md`); browser calls from the app code still passed without a site key in the `VERIFICATION.md` run, but adding the App Check site key to `.env` before deployment is recommended (code already supports it). On-device leg still needs the user's Chrome with Gemini Nano. |
 | 3 | Public GitHub/GitLab repo | ✅ done | Public repo created and pushed 2026-11-20: https://github.com/lisasa2526/hybridnotes (via authenticated `gh`, account lisasa2526). |
 | 4 | Open-source license file in repo | ✅ | `LICENSE` (MIT) at repo root. |
 | 5 | Text description incl. how Firebase AI Logic was used | 🛠️ drafted | Use the README sections "How Firebase AI Logic hybrid inference is used" + the draft description below; paste into the Devpost form. ⏳ pending-user to submit the form. |
 | 6 | Demo video ≤ 3 min, public on YouTube, in English | ⏳ pending-user | Script ready: `DEMO-SCRIPT.md`. Recording + upload must be done from the user's YouTube account. Must show the mode badge switching (on-device in Chrome; cloud or local elsewhere). |
-| 7 | Testing access link (live app URL) | ⏳ pending-user | Deploy `dist/` (e.g. Firebase Hosting under the user's project, or any static host) and put the URL in the Devpost form. Zero-setup testing works because of the local fallback engine. |
+| 7 | Testing access link (live app URL) | ✅ done | **https://lisasa2526.github.io/hybridnotes/** — `dist/` published to the repo's `gh-pages` branch 2026-11-20 (GitHub Pages route; Firebase Hosting remains an alternative, not required). Verified live: page + JS + CSS all HTTP 200, bundle contains the real config and `gemini-3.8-flash`. Zero-setup testing works because of the local fallback engine; in-browser cloud legs still need the App Check site key (row 8). Paste this URL into the Devpost form. |
 | 8 | Firebase project configured (AI Logic enabled) + `.env` values for the deployed build | ✅ done / ⏳ App Check follow-up | Project **hybridnotes-33869** (Spark, AI Logic via Gemini Developer API) created by the user 2026-11-20; real web config is in `.env` (gitignored) and confirmed inside the built bundle. Follow-up: App Check is now enforced — add the reCAPTCHA Enterprise site key as `VITE_FIREBASE_APPCHECK_SITE_KEY` before deploying (see `GATE.md` §2c). |
 | 9 | AI-assistant disclosure | ✅ | Disclosed in README ("Disclosure" section) and in the draft description below. The rules expressly allow AI coding assistants with disclosure. |
 | 10 | Devpost submission form completed before deadline | ⏳ pending-user | Final submit click is the user's. Suggested buffer: submit by Nov 29 PT, not on deadline day. |
@@ -68,13 +68,30 @@ the user's behalf)
   Required changing `CLOUD_MODEL` to `gemini-3.8-flash` (the API reports
   `gemini-2.5-flash` is no longer available to new users). Full evidence
   in `GATE.md`.
-- 🔶 App Check: from ≈12:47 CST 2026-11-20 the same calls return
-  `401 Firebase App Check token is invalid` — App Check enforcement is on.
-  Browser use needs the App Check site key in `.env`; Node re-verification
-  needs a registered debug token. See `GATE.md` §2c.
+- 🔶 App Check: from ≈12:47 CST 2026-11-20 the Node harness calls return
+  `401 Firebase App Check token is invalid` — App Check enforcement is on
+  for token-less non-browser calls. Node re-verification needs a
+  registered debug token. See `GATE.md` §2c.
+- ✅ Verified 2026-11-20 (independent browser run, see `VERIFICATION.md`):
+  chrome-headless-shell 158 running the app's own `src/firebase-ai.js`
+  against project hybridnotes-33869 — hybrid (`PREFER_ON_DEVICE`) and
+  cloud models both returned real Gemini summaries over HTTP 200 with
+  `inferenceSource: "in_cloud"`, **without** any App Check token, after
+  the Node 401s above. So the browser path currently passes as-is; the
+  App Check site key is still recommended before public deployment.
+  Same run confirmed the headless shell's `LanguageModel` is only an
+  echo stub ("this API is just echoing back the input") — not real
+  Gemini Nano, not counted as on-device verification.
 - ⚠️ **Not yet verified:** the on-device Gemini Nano leg — it needs the
   user's Chrome with Gemini Nano downloaded; cannot be tested in the
   build environment. Proof criteria are spelled out in `GATE.md` §3.
+- ✅ Verified 2026-11-20: testing link live on GitHub Pages —
+  https://lisasa2526.github.io/hybridnotes/ (built with
+  `vite build --base=./` so assets resolve under the project subpath;
+  same bundle hash as the verified build). Page, JS bundle and CSS all
+  return HTTP 200; the served JS contains the real project config and
+  the `gemini-3.8-flash` model string. Pages hosting does not change the
+  App Check caveat above for in-browser cloud calls.
 
 ## Remaining blockers
 
@@ -84,7 +101,9 @@ the user's behalf)
    https://github.com/lisasa2526/hybridnotes
 3. ⏳ App Check site key into `.env` (user, Firebase console) — needed for
    the deployed app's cloud legs.
-4. ⏳ Deploy `dist/` and capture the testing URL (user-assisted).
+4. ~~Deploy `dist/` and capture the testing URL~~ ✅ done 2026-11-20 via
+   GitHub Pages: https://lisasa2526.github.io/hybridnotes/ (Firebase
+   Hosting remains an alternative, not required).
 5. ⏳ On-device badge proof in the user's Chrome (user).
 6. ⏳ Record the ≤3 min English demo video (script in `DEMO-SCRIPT.md`)
    and upload publicly to YouTube (user).

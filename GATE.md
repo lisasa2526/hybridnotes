@@ -78,8 +78,9 @@ claimed to work**. The hybrid probe above at least proves the SDK falls
 back to cloud and reports `inferenceSource` truthfully when no device
 model exists.
 
-**What the user needs to do to prove it:** open the deployed app URL (or
-`npm run preview` on his own machine) in desktop **Chrome** with Gemini
+**What the user needs to do to prove it:** open the deployed app URL —
+**https://lisasa2526.github.io/hybridnotes/** (live since 2026-11-20) —
+(or `npm run preview` on his own machine) in desktop **Chrome** with Gemini
 Nano present (Chrome 128+; check `chrome://components` → "Optimization
 Guide On Device Model" is downloaded), paste a short note, click Run on
 Summarize. Proof = the result badge shows **on-device** and the detail
@@ -97,10 +98,33 @@ browser do need the site key from §2c.)
 | App Check site key / debug token (§2c) | ⏳ pending | **user** (Firebase console) |
 | Public GitHub repo under lisasa2526 | ✅ done — https://github.com/lisasa2526/hybridnotes | agent (gh was authenticated) |
 | Open-source license in repo | ✅ MIT `LICENSE` | — |
-| Hosting / testing link (deploy `dist/`) | ⏳ pending — Firebase Hosting under the user's project or any static host | **user-assisted** (deploy runs under his project; agent can prepare) |
+| Hosting / testing link (deploy `dist/`) | ✅ done — **https://lisasa2526.github.io/hybridnotes/** (GitHub Pages, `gh-pages` branch, 2026-11-20; Firebase Hosting remains an alternative, not required) | agent |
 | On-device badge proof (§3) | ⏳ pending | **user** (his Chrome) |
 | Demo video ≤ 3 min, public YouTube, English | ⏳ pending — script ready in `DEMO-SCRIPT.md` | **user** (his YouTube account; no upload by agent) |
 | Devpost form + final submit | ⏳ pending — draft text ready in `SUBMISSION.md`; suggested submit by Nov 29 PT, deadline Nov 30 14:00 PT | **user** (final click) |
+
+## 5. Testing link — ✅ LIVE via GitHub Pages (2026-11-20)
+
+- **URL: https://lisasa2526.github.io/hybridnotes/**
+- Published from the current `dist/` build to the repo's `gh-pages`
+  branch (only `index.html`, `assets/index-*.js`, `assets/index-*.css`,
+  `.nojekyll` — no `.env`, no `node_modules`). The build was re-run with
+  `vite build --base=./` first: the default absolute `/assets/...` paths
+  would have 404'd under the `/hybridnotes/` subpath. Bundle hash is
+  unchanged (`index-Y1PgPHmN.js`), so the deployed code is byte-identical
+  to the verified build — same real config (`hybridnotes-33869` present
+  in the served JS), same `gemini-3.8-flash` cloud model.
+- Verified live: page HTTP 200 (title "HybridNotes — Private notes,
+  summarized on your device"), referenced JS and CSS both HTTP 200.
+- **What this does NOT prove** (unchanged from §2c/§3): Pages only
+  provides the public testing link the submission needs. In-browser
+  *cloud* legs from this page still need the App Check site key
+  (`VITE_FIREBASE_APPCHECK_SITE_KEY`), and the on-device Gemini Nano leg
+  still needs the user's own Chrome. With zero setup the page answers
+  via the local fallback engine, honestly badged — the judge path works
+  today.
+- Firebase Hosting under the user's project remains an alternative host;
+  it is **not required** now that the Pages link is live.
 
 ## Gate verdict
 
