@@ -15,6 +15,9 @@
 //
 // Every path returns { text, mode, detail, latencyMs } where mode is one of
 // "on-device" | "cloud" | "local" — the UI badge renders exactly that.
+// INVARIANT: mode is always derived from the response's actual
+// `inferenceSource` (see modeFor below), never from which model was
+// configured to run — the two can disagree (see step 1).
 
 import { getFirebaseModels, ensureDeviceModel } from "./firebase-ai.js";
 import { isFirebaseConfigured } from "./firebase-config.js";
@@ -34,6 +37,20 @@ async function callModel(model, prompt) {
     text: response.text(),
     inferenceSource: response.inferenceSource || null, // "on_device" | "in_cloud" | undefined
   };
+}
+
+// Badge mode from the response's actual inferenceSource — the single
+// source of truth for what the badge may claim. A model configured
+// ONLY_ON_DEVICE can still be served in_cloud by the SDK (observed live
+// on the Pages deployment, 2026-11-20: badge said "On-device" while the
+// run's own meta line reported a cloud source), and a PREFER_ON_DEVICE
+// model can serve either way. `fallback` is used only when the response
+// carries no inferenceSource: it is the one source that model
+// configuration could have produced.
+function modeFor(inferenceSource, fallback) {
+  if (inferenceSource === "in_cloud") return "cloud";
+  if (inferenceSource === "on_device") return "on-device";
+  return fallback;
 }
 
 export async function runAction(request, { onProgress } = {}) {
@@ -59,7 +76,7 @@ export async function runAction(request, { onProgress } = {}) {
           if (text?.trim()) {
             return done(
               text.trim(),
-              "on-device",
+              modeFor(inferenceSource, "on-device"),
               inferenceSource === "in_cloud"
                 ? "Firebase reported a cloud source on the on-device pass — badge corrected to cloud."
                 : "Gemini Nano ran locally in Chrome via Firebase AI Logic (ONLY_ON_DEVICE). Your text never left this device."
@@ -74,11 +91,12 @@ export async function runAction(request, { onProgress } = {}) {
       try {
         const { text, inferenceSource } = await callModel(models.hybridModel, prompt);
         if (text?.trim()) {
-          return inferenceSource === "on_device"
-            ? done(text.trim(), "on-device", "Served by Gemini Nano on-device via the hybrid (PREFER_ON_DEVICE) model.")
+          const mode = modeFor(inferenceSource, "cloud");
+          return mode === "on-device"
+            ? done(text.trim(), mode, "Served by Gemini Nano on-device via the hybrid (PREFER_ON_DEVICE) model.")
             : done(
                 text.trim(),
-                "cloud",
+                mode,
                 "Served by cloud Gemini via the hybrid (PREFER_ON_DEVICE) model — on-device could not serve this request."
               );
         }
@@ -88,9 +106,9 @@ export async function runAction(request, { onProgress } = {}) {
 
       // 3) Cloud only.
       try {
-        const { text } = await callModel(models.cloudModel, prompt);
+        const { text, inferenceSource } = await callModel(models.cloudModel, prompt);
         if (text?.trim()) {
-          return done(text.trim(), "cloud", "Served by cloud Gemini via Firebase AI Logic.");
+          return done(text.trim(), modeFor(inferenceSource, "cloud"), "Served by cloud Gemini via Firebase AI Logic.");
         }
       } catch {
         // Fall through to local.

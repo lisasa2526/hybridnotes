@@ -88,6 +88,21 @@ error. (appCheck/recaptcha-error)`, generateContent → 401
 Cloud Console, or serve from Firebase Hosting (domains already
 registered). Full evidence: `VERIFICATION.md` §5.
 
+**Blocker resolved (2026-11-20 ~13:14–13:28 CST):** the domain was
+added to the key; after a few minutes' propagation the live Pages
+origin passes the full chain — App Check token minted and exchanged
+(200), cloud `generateContent` 200 with `inferenceSource:
+"in_cloud"`, and the real app UI (on-device API removed to force
+the cloud legs) badged "🔵 Cloud · Gemini". The 13:15 UI retest
+that still showed Local fallback ran ~1 minute after the console
+edit — propagation lag. Headless bot-score hypothesis refuted
+(token accepted from the same headless browser). One residual
+risk: the free tier allows only 20 generateContent requests/day
+for gemini-3.8-flash (a 429 was observed mid-run; the chain's next
+call succeeded) — demo-day traffic could exhaust it and the app
+would honestly fall back to local until reset. Full evidence:
+`VERIFICATION.md` §5 addendum.
+
 ## 3. On-device path (ONLY_ON_DEVICE / Gemini Nano) — ⚠️ NOT testable here
 
 This environment has no Chrome and no Gemini Nano (Node has no
@@ -114,7 +129,7 @@ browser do need the site key from §2c.)
 | Firebase project + AI Logic + web config in `.env` | ✅ done (hybridnotes-33869, Spark) | — |
 | Cloud path verified live | ✅ PASS (evidence §2b); re-verified after App Check fix — Node + debug token PASS, 401 gone (see §2c status update) | agent |
 | App Check site key / debug token (§2c) | ✅ done 2026-11-20 (console by user/parent; wiring + re-verification by agent) | — |
-| reCAPTCHA key domain for Pages origin | ⏳ pending — add `lisasa2526.github.io` to the key's domains in Google Cloud Console (or serve from Firebase Hosting); until then Pages cloud legs fall back to local | **user/parent** (console) |
+| reCAPTCHA key domain for Pages origin | ✅ done 2026-11-20 — `lisasa2526.github.io` added to the key's domains (~13:14 CST); verified live ~13:20–13:28 CST: SDK probe getToken OK + generateContent 200 `in_cloud`, real app UI (on-device API removed) badged "🔵 Cloud · Gemini" — see VERIFICATION.md §5 addendum. New caveat: free-tier quota is only 20 generateContent requests/day for gemini-3.8-flash (one 429 observed); heavy demo-day traffic could exhaust it → honest local fallback until reset | — (raising quota = owner's billing call) |
 | Public GitHub repo under lisasa2526 | ✅ done — https://github.com/lisasa2526/hybridnotes | agent (gh was authenticated) |
 | Open-source license in repo | ✅ MIT `LICENSE` | — |
 | Hosting / testing link (deploy `dist/`) | ✅ done — **https://lisasa2526.github.io/hybridnotes/** (GitHub Pages, `gh-pages` branch, 2026-11-20; Firebase Hosting remains an alternative, not required) | agent |
@@ -144,6 +159,9 @@ browser do need the site key from §2c.)
   refuses tokens for the unregistered `lisasa2526.github.io` domain,
   so Pages cloud legs still land on the local fallback until the
   domain is registered on the key — §2c status update.)
+  (Update 2026-11-20 ~13:28 CST: domain registered and verified —
+  Pages cloud legs now serve real cloud Gemini end-to-end; see the
+  §2c "Blocker resolved" note and `VERIFICATION.md` §5 addendum.)
 - Firebase Hosting under the user's project remains an alternative host;
   it is **not required** now that the Pages link is live.
 
@@ -153,7 +171,57 @@ browser do need the site key from §2c.)
 before App Check enforcement flipped on). **On-device leg: UNVERIFIED**
 (needs the user's Chrome). **Overall: conditionally passed** — App
 Check is now configured and the Node path re-verifies clean with a
-debug token; the one outstanding item is registering the GitHub
-Pages domain on the reCAPTCHA key (or moving hosting to Firebase
-Hosting) so the public Pages link can mint App Check tokens
-(§2c status update, `VERIFICATION.md` §5).
+debug token; the GitHub Pages domain has since been registered on
+the reCAPTCHA key and the public Pages link now mints App Check
+tokens and serves real cloud results end-to-end (verified
+2026-11-20 ~13:20–13:28 CST, `VERIFICATION.md` §5 addendum). The
+only remaining caveats are the on-device proof in the user's own
+Chrome and the free-tier ceiling of 20 cloud requests/day.
+
+## 6. Badge-label fix — 2026-11-20 (later session)
+
+**Bug (found by the final audit's live run):** when the SDK served
+**cloud** on the ONLY_ON_DEVICE pass, the run-meta line correctly said
+*"Firebase reported a cloud source on the on-device pass — badge
+corrected to cloud"* but the badge label still read "🟢 On-device ·
+Gemini Nano". Root cause: step 1 of `runAction` in
+`src/hybrid-service.js` hardcoded mode `"on-device"` (the configured
+model) while the meta text was derived from the response's
+`inferenceSource` — the two disagreed.
+
+**Fix:** a single helper `modeFor(inferenceSource, fallback)` now
+derives the badge mode from the response's actual `inferenceSource`
+in **every** model path (on-device pass, hybrid, plain cloud):
+`in_cloud` → cloud, `on_device` → on-device, missing → the only
+source that configuration could have served. Meta lines unchanged.
+Label and meta are now computed from the same variable in the same
+return, so they cannot disagree.
+
+**Build/deploy:** rebuilt `vite build --base=./` → new bundle
+`index-pQ1H7Q2e.js` (was `index-BSNZ6M7b.js`); redeployed to
+`gh-pages` (commit `ba0fc0e`); live site verified serving the new
+bundle (page/JS/CSS all HTTP 200, HTML references the new hash).
+
+**Re-verification:**
+- `scripts/verify-cloud.mjs` **with debug token: not runnable from
+  this session** — the App Check debug token was never persisted
+  (searched env, `.env`, shell history, workspace: absent; it only
+  ever existed in the §5 session's ephemeral env). Token-less re-run
+  reproduces the documented baseline exactly (both calls 401 "App
+  Check token is invalid" — enforcement unchanged; the script does
+  not import the changed file). The §2b/§5 with-token PASS evidence
+  stands for the unchanged SDK path.
+- Live Pages UI runs (chrome-headless-shell 158, audit method,
+  sample → Summarize, new bundle): run 1 — App Check exchanges 200,
+  generateContent 200s: cloud serves end-to-end on the fixed build
+  (badge text not captured — harness logging truncation, noted
+  honestly). Run 2 — generateContent hit the free-tier daily quota
+  (429s; the 20/day budget was consumed by today's cumulative
+  verification across sessions) and the app fell back to local:
+  badge "🟠 Local fallback · built-in engine" **matches** the meta
+  line ("No Gemini model could serve this request…") — label/meta
+  consistency confirmed live on the fallback path.
+- Residual: re-capturing the badge text on the specific step-1
+  cloud-serve edge needs one more live run after the daily quota
+  resets; structurally, label and meta can no longer diverge (same
+  `inferenceSource` drives both).

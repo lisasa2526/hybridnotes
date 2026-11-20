@@ -175,3 +175,88 @@ reCAPTCHA key's domain list (exactly the risk flagged beforehand)**
   Until then, the Pages deployment answers via the honest local
   fallback; the cloud legs work from registered domains / with a
   debug token.
+
+### §5 addendum — domain fix verified live; 13:15 local-fallback retest explained (2026-11-20 ~13:20–13:28 CST)
+
+`lisasa2526.github.io` was added to the reCAPTCHA key's domains
+(~13:14 CST, console confirmed saved). A UI retest at 13:15 still
+showed Local fallback, so the live Pages origin was re-diagnosed
+from scratch in chrome-headless-shell 158 (same harness as §2/§5:
+puppeteer-core + proxy-chain relay), capturing console + network:
+
+- **Same-origin SDK probe (Pages origin):** App Check
+  `getToken()` → **OK** (961-char token);
+  `:exchangeRecaptchaEnterpriseToken` → **200** with a real JWT
+  (ttl 3600s, provider `recaptcha_enterprise`);
+  cloud `generateContent` → **200**, real Gemini text,
+  `inferenceSource: "in_cloud"`. No `appCheck/recaptcha-error`
+  anywhere in the console.
+- **Real app UI with the on-device API removed** (forces the chain
+  past the headless echo stub into the cloud legs): badge
+  **"🔵 Cloud · Gemini"**, detail *"Served by cloud Gemini via the
+  hybrid (PREFER_ON_DEVICE) model — on-device could not serve this
+  request."*, real summary returned in ~11 s.
+- **Repeat probe after a further ~2 min wait:** getToken OK,
+  generateContent 200 again — stable, not a flake.
+- **Headless bot-score hypothesis: refuted.** The token was minted
+  and accepted from the very same headless browser §5 used
+  (`webdriver=true`, HeadlessChrome UA). The earlier
+  `recaptcha-error` was the unregistered domain, exactly as
+  diagnosed; nothing about the current failure mode is
+  headless-specific, and there is no evidence the site is broken
+  for human judges in real browsers — the opposite: the full chain
+  now passes end-to-end from the public Pages origin.
+- **Why the 13:15 retest still showed Local fallback (judgment):**
+  the domain edit was ~1 minute old — reCAPTCHA key changes take
+  minutes to propagate to token issuance. By ~13:20 the same tests
+  pass consistently. Confidence: high that propagation lag explains
+  the 13:15 result.
+- **New residual risk found during this diagnosis — free-tier
+  daily quota:** one `generateContent` call in the UI run returned
+  **429** *"Quota exceeded for metric:
+  generativelanguage.googleapis.com/generate_content_free_tier_requests,
+  limit: 20, model: gemini-3.8-flash … per day limit exceeded on
+  Free Tier"* (the chain's next call succeeded with 200, so the run
+  still finished Cloud). Only **20 cloud requests/day** on the free
+  tier: heavy same-day testing — or judge traffic on demo day —
+  can exhaust it, after which the app honestly falls back to local
+  until the quota resets. This is a quota ceiling, not a code or
+  App Check defect; raising it needs the project's billing/plan
+  (owner's call), and it also means verification runs should be
+  budgeted against the daily 20.
+- Note on method: with the headless echo stub present, the app's
+  chain stops at the on-device leg (badge "On-device", echo text —
+  the §3 stub artifact) and never exercises the cloud legs; cloud
+  diagnosis therefore requires removing `LanguageModel` or using
+  the SDK probe, as done here.
+
+## 6. Badge-label fix — verification (2026-11-20, later session)
+
+- **Fix:** `src/hybrid-service.js` — badge `mode` is now derived from
+  the response's `inferenceSource` via `modeFor()` in all three model
+  paths; previously step 1 (ONLY_ON_DEVICE pass) hardcoded
+  `"on-device"`, so a cloud-served response wore an On-device badge
+  while its own meta line reported cloud. Meta lines unchanged.
+- **Build/deploy:** bundle `index-BSNZ6M7b.js` → `index-pQ1H7Q2e.js`;
+  `gh-pages` commit `ba0fc0e`; live https://lisasa2526.github.io/hybridnotes/
+  serves the new bundle (200s; HTML references the new hash).
+- **Node harness:** debug token not persisted anywhere accessible
+  (env/`.env`/history/workspace searched) — with-token re-run not
+  possible from this session; token-less run reproduces the §5
+  baseline (401 App Check on both calls), i.e. no change in the SDK
+  path's behavior. The fix does not touch the code paths
+  `verify-cloud.mjs` exercises (`firebase-ai.js`/`prompts.js`).
+- **Live UI (headless-shell 158, on-device API removed, sample →
+  Summarize):** run 1 on the fixed build: App Check
+  `:exchangeRecaptchaEnterpriseToken` 200 ×2, `generateContent`
+  200 ×2 (with two 429 rate-limit responses mid-chain) — cloud
+  end-to-end on the new bundle; the run's badge text was lost to a
+  logging truncation in this session (recorded as a miss, not
+  reconstructed). Run 2: quota exhausted (429 ×3 after one 200) →
+  honest local fallback; badge "🟠 Local fallback · built-in engine"
+  and meta "No Gemini model could serve this request, so the
+  built-in local engine answered." agree.
+- **Not re-captured:** the badge text for the exact step-1
+  cloud-serve edge (needs a post-quota-reset run). By construction
+  the label and meta now come from the same `inferenceSource` value,
+  so the §-audit disagreement cannot recur.
