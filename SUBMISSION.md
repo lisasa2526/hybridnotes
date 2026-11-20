@@ -1,0 +1,92 @@
+# Devpost Submission Checklist — #BuildHybridAI
+
+Project: **HybridNotes**
+Deadline: **November 30, 2026, 2:00 pm PT** (= Dec 1, 06:00 Beijing)
+Target prizes: Grand $10,000 · Runner-up $7,000 · 2nd Runner-up $4,000 ·
+Best Web/Chrome Application $3,000
+Eligibility note: China is not on the rules' exclusion list (verified
+2026-11-20 on the official Devpost rules page).
+
+Status key: ✅ done · 🛠️ in progress · ⏳ pending-user (needs the user's own
+account/action — the assistant must not log in, create repos, or upload on
+the user's behalf)
+
+## Requirements mapping
+
+| # | Devpost requirement | Status | Notes |
+| --- | --- | --- | --- |
+| 1 | GenAI web app built with Firebase AI Logic | ✅ | `src/firebase-ai.js` imports `firebase/ai`, creates `ONLY_ON_DEVICE`, `PREFER_ON_DEVICE` hybrid and cloud models; `src/hybrid-service.js` calls them at runtime on every Run click when configured. |
+| 2 | Hybrid inference actually used (on-device + cloud fallback) | ✅ cloud verified live / ⚠️ on-device unverified | Cloud leg proven 2026-11-20 against the real project (see `GATE.md`): real Gemini response with `inferenceSource: "in_cloud"`. Model had to move `gemini-2.5-flash` → `gemini-3.8-flash` (API retired the old one for new users). Since ≈12:47 CST the project enforces App Check, so browser/cloud use needs the App Check site key in `.env` (code already supports it). On-device leg still needs the user's Chrome with Gemini Nano. |
+| 3 | Public GitHub/GitLab repo | ✅ done | Public repo created and pushed 2026-11-20: https://github.com/lisasa2526/hybridnotes (via authenticated `gh`, account lisasa2526). |
+| 4 | Open-source license file in repo | ✅ | `LICENSE` (MIT) at repo root. |
+| 5 | Text description incl. how Firebase AI Logic was used | 🛠️ drafted | Use the README sections "How Firebase AI Logic hybrid inference is used" + the draft description below; paste into the Devpost form. ⏳ pending-user to submit the form. |
+| 6 | Demo video ≤ 3 min, public on YouTube, in English | ⏳ pending-user | Script ready: `DEMO-SCRIPT.md`. Recording + upload must be done from the user's YouTube account. Must show the mode badge switching (on-device in Chrome; cloud or local elsewhere). |
+| 7 | Testing access link (live app URL) | ⏳ pending-user | Deploy `dist/` (e.g. Firebase Hosting under the user's project, or any static host) and put the URL in the Devpost form. Zero-setup testing works because of the local fallback engine. |
+| 8 | Firebase project configured (AI Logic enabled) + `.env` values for the deployed build | ✅ done / ⏳ App Check follow-up | Project **hybridnotes-33869** (Spark, AI Logic via Gemini Developer API) created by the user 2026-11-20; real web config is in `.env` (gitignored) and confirmed inside the built bundle. Follow-up: App Check is now enforced — add the reCAPTCHA Enterprise site key as `VITE_FIREBASE_APPCHECK_SITE_KEY` before deploying (see `GATE.md` §2c). |
+| 9 | AI-assistant disclosure | ✅ | Disclosed in README ("Disclosure" section) and in the draft description below. The rules expressly allow AI coding assistants with disclosure. |
+| 10 | Devpost submission form completed before deadline | ⏳ pending-user | Final submit click is the user's. Suggested buffer: submit by Nov 29 PT, not on deadline day. |
+
+## Draft Devpost text description (ready to paste)
+
+> **HybridNotes — sensitive notes, processed where they belong.**
+>
+> People paste confidential meeting notes, contract excerpts and private
+> journals into AI websites every day. HybridNotes asks why a short,
+> sensitive note should ever leave your laptop.
+>
+> Built with **Firebase AI Logic** hybrid inference, HybridNotes
+> summarizes, rewrites and translates text through a four-step chain:
+> (1) a Firebase AI Logic model with `InferenceMode.ONLY_ON_DEVICE` runs
+> Gemini Nano in Chrome for short/sensitive input — the text never leaves
+> the device; (2) a `PREFER_ON_DEVICE` hybrid model serves longer input,
+> falling back to cloud Gemini (`gemini-3.8-flash`) when the device can't;
+> (3) an explicit cloud model; and (4) a built-in local extractive engine
+> so the demo works with zero setup. The result badge is driven by
+> `GenerateContentResponse.inferenceSource`, so it always shows the engine
+> that actually ran — on-device, cloud, or local.
+>
+> Developed with the help of an AI coding assistant, as permitted by the
+> hackathon rules; all project code is original to this repository apart
+> from the Firebase/Vite libraries.
+
+## Verification log
+
+- ✅ Verified 2026-11-20: `npm install` (firebase ^12, vite ^7) +
+  `npm run build` succeed — Vite production build, `dist/` ≈ 100 KB,
+  bundle confirmed to contain the Firebase AI Logic hybrid code
+  (`only_on_device` / `prefer_on_device` / `gemini-2.5-flash` strings).
+- ✅ Verified 2026-11-20: `vite preview` serves the built app (HTTP 200).
+- ✅ Verified 2026-11-20 (Node, no Firebase config): the full run chain
+  answers via the local engine — extractive summary, rewrite cleanup and
+  EN→ZH gloss all produce output; `hybrid-service.runAction()` returns
+  `mode: "local"` with the honest "Firebase is not configured" detail.
+  This is the zero-setup judge path (badge: Local fallback).
+- ✅ Verified 2026-11-20 (Node harness `scripts/verify-cloud.mjs`, real
+  project hybridnotes-33869): real Firebase AI Logic **cloud** calls
+  succeeded — cloud model and `PREFER_ON_DEVICE` hybrid both returned real
+  Gemini text with `inferenceSource: "in_cloud"` and real usageMetadata.
+  Required changing `CLOUD_MODEL` to `gemini-3.8-flash` (the API reports
+  `gemini-2.5-flash` is no longer available to new users). Full evidence
+  in `GATE.md`.
+- 🔶 App Check: from ≈12:47 CST 2026-11-20 the same calls return
+  `401 Firebase App Check token is invalid` — App Check enforcement is on.
+  Browser use needs the App Check site key in `.env`; Node re-verification
+  needs a registered debug token. See `GATE.md` §2c.
+- ⚠️ **Not yet verified:** the on-device Gemini Nano leg — it needs the
+  user's Chrome with Gemini Nano downloaded; cannot be tested in the
+  build environment. Proof criteria are spelled out in `GATE.md` §3.
+
+## Remaining blockers
+
+1. ~~Create Firebase project + enable AI Logic + provide web config~~ ✅
+   done 2026-11-20 (project hybridnotes-33869; cloud path verified).
+2. ~~Create public GitHub repo (lisasa2526) and push~~ ✅ done 2026-11-20:
+   https://github.com/lisasa2526/hybridnotes
+3. ⏳ App Check site key into `.env` (user, Firebase console) — needed for
+   the deployed app's cloud legs.
+4. ⏳ Deploy `dist/` and capture the testing URL (user-assisted).
+5. ⏳ On-device badge proof in the user's Chrome (user).
+6. ⏳ Record the ≤3 min English demo video (script in `DEMO-SCRIPT.md`)
+   and upload publicly to YouTube (user).
+7. ⏳ Paste description, repo URL, video URL and testing URL into the
+   Devpost form and submit before **Nov 30, 2026, 2:00 pm PT** (user).

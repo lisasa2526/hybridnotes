@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>HybridNotes — Private notes, summarized on your device</title>
+    <meta
+      name="description"
+      content="HybridNotes summarizes, rewrites and translates sensitive notes with hybrid inference: on-device Gemini Nano first, cloud Gemini only when needed."
+    />
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🛡️</text></svg>" />
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">HN</span>
+        <div>
+          <h1>HybridNotes</h1>
+          <p class="tagline">Sensitive notes, processed where they belong — on your device.</p>
+        </div>
+      </div>
+      <div id="engine-status" class="engine-status" role="status">Checking inference engines…</div>
+    </header>
+
+    <section class="privacy-strip" aria-label="How hybrid inference protects your text">
+      <div class="privacy-step">
+        <strong>1 · On-device first</strong>
+        <span>Short, sensitive text runs on Gemini Nano in Chrome. It never leaves this machine.</span>
+      </div>
+      <div class="privacy-step">
+        <strong>2 · Cloud only when needed</strong>
+        <span>Long documents, or devices without the on-device model, fall back to cloud Gemini.</span>
+      </div>
+      <div class="privacy-step">
+        <strong>3 · Always honest</strong>
+        <span>Every result is badged with the engine that actually ran: on-device, cloud, or local.</span>
+      </div>
+    </section>
+
+    <main class="workspace">
+      <section class="pane input-pane" aria-label="Your note">
+        <div class="pane-head">
+          <h2>Your note</h2>
+          <button id="sample-btn" class="ghost-btn" type="button">Load a sample meeting note</button>
+        </div>
+        <textarea
+          id="input-text"
+          rows="14"
+          placeholder="Paste a meeting note, a private journal entry, a contract excerpt — anything you'd rather not upload to a random AI website…"
+        ></textarea>
+        <div class="pane-foot">
+          <span id="char-count">0 characters</span>
+          <span id="route-hint" class="route-hint"></span>
+        </div>
+      </section>
+
+      <section class="pane output-pane" aria-label="Result">
+        <div class="pane-head">
+          <h2>Result</h2>
+          <div id="mode-badge" class="mode-badge mode-none">No run yet</div>
+        </div>
+
+        <div class="controls">
+          <div class="action-tabs" role="tablist" aria-label="Action">
+            <button class="tab active" data-action="summarize" role="tab" aria-selected="true" type="button">Summarize</button>
+            <button class="tab" data-action="rewrite" role="tab" aria-selected="false" type="button">Rewrite</button>
+            <button class="tab" data-action="translate" role="tab" aria-selected="false" type="button">Translate</button>
+          </div>
+
+          <label class="option" id="opt-length">
+            Summary length
+            <select id="summary-length">
+              <option value="short">Short (1–2 sentences)</option>
+              <option value="medium" selected>Medium (a short paragraph)</option>
+              <option value="detailed">Detailed (with key points)</option>
+            </select>
+          </label>
+
+          <label class="option hidden" id="opt-style">
+            Rewrite style
+            <select id="rewrite-style">
+              <option value="clear" selected>Clear &amp; professional</option>
+              <option value="concise">More concise</option>
+              <option value="friendly">Friendly</option>
+              <option value="formal">Formal</option>
+            </select>
+          </label>
+
+          <label class="option hidden" id="opt-lang">
+            Translate to
+            <select id="target-lang">
+              <option value="English" selected>English</option>
+              <option value="Simplified Chinese">Simplified Chinese</option>
+              <option value="Spanish">Spanish</option>
+              <option value="French">French</option>
+              <option value="German">German</option>
+              <option value="Japanese">Japanese</option>
+            </select>
+          </label>
+
+          <button id="run-btn" class="run-btn" type="button">Run</button>
+        </div>
+
+        <div id="progress" class="progress hidden" aria-live="polite"></div>
+        <div id="output" class="output" aria-live="polite">
+          <p class="placeholder">Your result will appear here — badged with the engine that produced it.</p>
+        </div>
+        <div class="pane-foot">
+          <span id="run-meta"></span>
+          <button id="copy-btn" class="ghost-btn" type="button" disabled>Copy result</button>
+        </div>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <p>
+        Built with <strong>Firebase AI Logic</strong> hybrid inference (Gemini Nano on-device via Chrome,
+        cloud Gemini fallback). If Firebase is not configured or no model is reachable, a built-in local
+        extractive engine still answers — and the badge tells you so.
+      </p>
+      <p class="disclosure">Open-source under the MIT License. Developed with the help of an AI coding assistant; disclosed in the README.</p>
+    </footer>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>

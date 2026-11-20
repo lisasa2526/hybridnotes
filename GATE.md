@@ -1,0 +1,112 @@
+# Confidence Gate — HybridNotes (BuildHybridAI)
+
+Verified: **2026-11-20** (Beijing time), against the real Firebase project.
+Harness: `scripts/verify-cloud.mjs` (Node, firebase JS SDK v12 — the same
+SDK and the same initialization as `src/firebase-ai.js`: `GoogleAIBackend`,
+same system instruction, prompt built by `src/prompts.js`).
+
+## ⚠️ Config discrepancy found first (read this)
+
+The task brief named projectId **hybridnotes-e1d89**, and the `.env` present
+at the start of this session indeed contained an `hybridnotes-e1d89` config.
+Mid-session (≈12:42 CST) `.env` was replaced by a different, internally
+consistent config — project **hybridnotes-33869** (authDomain / storage
+bucket / messagingSenderId / appId all match each other, and this is also
+the projectId recorded in long-term memory from the browser setup).
+`dist/` was rebuilt against it at the same moment. All verification below
+ran against **hybridnotes-33869**, md5-stable throughout. If e1d89 was a
+real second project, it is not the one wired up now.
+
+## 1. Build + config wiring — ✅ PASS
+
+- `npm run build` succeeds (Vite, bundle ≈ 82.5 KB JS).
+- Built bundle contains `hybridnotes-33869` (×3) and an apiKey-format
+  string — the real config is wired in, not placeholders (`.env` itself is
+  gitignored and was never committed).
+
+## 2. Real cloud call (Firebase AI Logic, GoogleAIBackend) — ✅ PASS, then 🔶 blocked by App Check
+
+Two real findings, in order:
+
+**(a) The app's pinned model was dead.** With the original
+`gemini-2.5-flash`, the API returned a real 404:
+*"This model models/gemini-2.5-flash is no longer available to new users.
+Please update your code to use models/gemini-3.8-flash…"*
+→ Fixed: `CLOUD_MODEL` in `src/firebase-ai.js` is now `gemini-3.8-flash`
+(the replacement the API itself names), bundle rebuilt and re-grepped.
+
+**(b) With `gemini-3.8-flash`, real calls succeeded (≈12:44 CST):**
+
+- Cloud model — SUCCESS. `inferenceSource: "in_cloud"`,
+  usageMetadata: prompt 136 tokens / candidates 12 / total 809.
+  Response text: *"The team agreed to ship the HybridNotes demo this week."*
+- Hybrid model (`PREFER_ON_DEVICE`) — SUCCESS.
+  `inferenceSource: "in_cloud"` (honest: Node has no Gemini Nano, so the
+  SDK served cloud and said so), usageMetadata total 546 tokens.
+  Response text: *"The team agreed to ship the HybridNotes demo this week,
+  with testing the fallback chain on older Chromebooks identified as a
+  critical prerequisite before the release."*
+
+This is a genuine end-to-end pass: real project, real Gemini response,
+SDK-reported cloud source — not the local fallback.
+
+**(c) Minutes later (≈12:47 CST) the same calls began failing with:**
+`[401 Unauthorized] Firebase App Check token is invalid.`
+Retried after a wait — consistent. Interpretation: **App Check
+enforcement for the AI Logic API was switched on in the project during
+this window** (the passing calls prove it was not enforced at ≈12:44).
+The Node harness cannot mint an App Check token (no reCAPTCHA in Node, no
+registered debug token), so Node-side verification is blocked *by App
+Check*, not by the AI Logic path itself.
+
+**Fix (console steps, user/parent):**
+1. For browser use: complete App Check setup for the Web app
+   (reCAPTCHA Enterprise) in Firebase console → put the site key in
+   `.env` as `VITE_FIREBASE_APPCHECK_SITE_KEY` — `src/firebase-ai.js`
+   already initializes App Check automatically when that key exists.
+2. For Node re-verification: register an App Check **debug token** in
+   the console (App Check → Apps → ⋮ → Manage debug tokens), then the
+   harness can run with it.
+3. (Not recommended beyond demo day: turning enforcement back off also
+   unblocks, at the cost of an unprotected endpoint.)
+
+## 3. On-device path (ONLY_ON_DEVICE / Gemini Nano) — ⚠️ NOT testable here
+
+This environment has no Chrome and no Gemini Nano (Node has no
+`window.ai`), so the on-device leg **cannot be verified here and is not
+claimed to work**. The hybrid probe above at least proves the SDK falls
+back to cloud and reports `inferenceSource` truthfully when no device
+model exists.
+
+**What the user needs to do to prove it:** open the deployed app URL (or
+`npm run preview` on his own machine) in desktop **Chrome** with Gemini
+Nano present (Chrome 128+; check `chrome://components` → "Optimization
+Guide On Device Model" is downloaded), paste a short note, click Run on
+Summarize. Proof = the result badge shows **on-device** and the detail
+line reads *"Gemini Nano ran locally in Chrome via Firebase AI Logic
+(ONLY_ON_DEVICE). Your text never left this device."* (On-device calls
+are local, so App Check does not block this leg; the cloud legs in the
+browser do need the site key from §2c.)
+
+## 4. Remaining submission checklist (from SUBMISSION.md)
+
+| Item | Status | Owner |
+| --- | --- | --- |
+| Firebase project + AI Logic + web config in `.env` | ✅ done (hybridnotes-33869, Spark) | — |
+| Cloud path verified live | ✅ PASS (evidence §2b); re-verify after App Check fix | agent, after user console step |
+| App Check site key / debug token (§2c) | ⏳ pending | **user** (Firebase console) |
+| Public GitHub repo under lisasa2526 | ✅ done — https://github.com/lisasa2526/hybridnotes | agent (gh was authenticated) |
+| Open-source license in repo | ✅ MIT `LICENSE` | — |
+| Hosting / testing link (deploy `dist/`) | ⏳ pending — Firebase Hosting under the user's project or any static host | **user-assisted** (deploy runs under his project; agent can prepare) |
+| On-device badge proof (§3) | ⏳ pending | **user** (his Chrome) |
+| Demo video ≤ 3 min, public YouTube, English | ⏳ pending — script ready in `DEMO-SCRIPT.md` | **user** (his YouTube account; no upload by agent) |
+| Devpost form + final submit | ⏳ pending — draft text ready in `SUBMISSION.md`; suggested submit by Nov 29 PT, deadline Nov 30 14:00 PT | **user** (final click) |
+
+## Gate verdict
+
+**Cloud leg: PASS** (real Gemini response, `inferenceSource: "in_cloud"`,
+before App Check enforcement flipped on). **On-device leg: UNVERIFIED**
+(needs the user's Chrome). **Overall: conditionally passed** — the one
+outstanding technical fix is App Check configuration in the console
+(§2c), after which `node scripts/verify-cloud.mjs` (with a debug token)
+or a browser run re-confirms in minutes.
